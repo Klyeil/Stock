@@ -1,11 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "apiHandler.h"
 #include "dataProcessor.h"
 #include "backTester.h"
 #include "apiSearch.h"
 #include "chartPlotter.h"
 
+
+
+static DailyData* lastAnalyzedData = NULL;
+static int lastDataCount = 0;
+static char lastSymbol[16] = {0};
 
 void pressEnterToContinue() {
     printf("\n계속하려면 Enter 키를 누르세요...");
@@ -16,11 +22,17 @@ void pressEnterToContinue() {
 void printMainMenu() {
     system("clear");
     printf("=========================================\n");
-    printf("========   C언어 주식 분석 프로그램   ========\n");
+    printf("=   C언어 주식 분석 및 백테스팅 플랫폼   =\n");
     printf("=========================================\n");
+    if (lastDataCount > 0) {
+        printf("  [현재 분석된 종목: %s]\n", lastSymbol);
+    }
     printf("\n");
     printf("  1. 새로운 종목 분석하기\n");
     printf("  2. 종목 검색하기\n");
+    if (lastDataCount > 0) {
+        printf("  3. 마지막 분석 차트 보기\n");
+    }
     printf("  0. 프로그램 종료\n");
     printf("\n");
     printf("=========================================\n");
@@ -28,29 +40,45 @@ void printMainMenu() {
 }
 
 void analyzeStock() {
-    char symbol[10];
-    const char* apiKey = "W46WANT3781FTIOS";
+    const char* apiKey = "YOUR_API_KEY";
+    char currentSymbol[16];
 
     system("clear");
     printf("## 새로운 종목 분석 ##\n");
     printf("분석할 미국 주식 종목 코드를 입력하세요 (예: IBM, AAPL): ");
-    scanf("%s", symbol);
+    scanf("%s", currentSymbol);
 
-    if (fetchAndSaveData(symbol, apiKey) == 0) {
+
+    if (lastAnalyzedData != NULL) {
+        freeData(lastAnalyzedData);
+        lastAnalyzedData = NULL;
+        lastDataCount = 0;
+    }
+
+    if (fetchAndSaveData(currentSymbol, apiKey) == 0) {
         char filePath[256];
-        snprintf(filePath, sizeof(filePath), "data/%s_daily.csv", symbol);
+        snprintf(filePath, sizeof(filePath), "data/%s_daily.csv", currentSymbol);
 
-        DailyData* stockData = NULL;
-        int dataCount = loadCsvFile(filePath, &stockData);
+        int dataCount = loadCsvFile(filePath, &lastAnalyzedData);
 
         if (dataCount > 0) {
-            calculateSma(stockData, dataCount, 5);
-            calculateSma(stockData, dataCount, 20);
-            runBacktest(stockData, dataCount);
-            plotChart(stockData, dataCount);
+            lastDataCount = dataCount;
+            strcpy(lastSymbol, currentSymbol);
 
-            freeData(stockData);
+            calculateSma(lastAnalyzedData, lastDataCount, 5);
+            calculateSma(lastAnalyzedData, lastDataCount, 20);
+            runBacktest(lastAnalyzedData, lastDataCount);
+
         }
+    }
+    pressEnterToContinue();
+}
+
+void viewChart() {
+    if (lastAnalyzedData == NULL) {
+        printf("먼저 종목 분석을 실행해주세요.\n");
+    } else {
+        plotChart(lastAnalyzedData, lastDataCount);
     }
     pressEnterToContinue();
 }
@@ -82,8 +110,19 @@ int main() {
             case 2:
                 searchStock();
                 break;
+            case 3:
+                if (lastDataCount > 0) {
+                    viewChart();
+                } else {
+                    printf("잘못된 선택입니다. 다시 입력해주세요.\n");
+                    pressEnterToContinue();
+                }
+                break;
             case 0:
                 printf("프로그램을 종료합니다.\n");
+                if (lastAnalyzedData != NULL) {
+                    freeData(lastAnalyzedData);
+                }
                 return 0;
             default:
                 printf("잘못된 선택입니다. 다시 입력해주세요.\n");
