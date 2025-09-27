@@ -6,6 +6,7 @@
 #include "backTester.h"
 #include "apiSearch.h"
 #include "chartPlotter.h"
+#include "stockList.h"
 
 
 
@@ -28,15 +29,21 @@ void printMainMenu() {
         printf("  [현재 분석된 종목: %s]\n", lastSymbol);
     }
     printf("\n");
-    printf("  1. 새로운 종목 분석하기\n");
+    printf("  1. 종목 분석하기\n");
     printf("  2. 종목 검색하기\n");
+    printf("  3. 종목 목록 보기\n");
     if (lastDataCount > 0) {
-        printf("  3. 마지막 분석 차트 보기\n");
+        printf("  4. 마지막 분석 차트 보기\n");
     }
     printf("  0. 프로그램 종료\n");
     printf("\n");
     printf("=========================================\n");
     printf("선택: ");
+}
+
+void viewStockList() {
+    displayStockList();
+    pressEnterToContinue();
 }
 
 void analyzeStock() {
@@ -89,7 +96,7 @@ void searchStock() {
 
     system("clear");
     printf("## 종목 검색 ##\n");
-    printf("검색할 키워드를 입력하세요 (예: samsung, apple, microsoft): ");
+    printf("검색할 키워드를 입력하세요 (예: apple, microsoft): ");
     scanf("%s", keyword);
 
     searchSymbols(keyword, apiKey);
@@ -111,6 +118,9 @@ int main() {
                 searchStock();
                 break;
             case 3:
+                viewStockList();
+                break;
+            case 4:
                 if (lastDataCount > 0) {
                     viewChart();
                 } else {
