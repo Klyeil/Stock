@@ -7,54 +7,45 @@
 #include "apiSearch.h"
 #include "chartPlotter.h"
 #include "stockList.h"
-
-
+#include "virtualTrader.h"
+#include "mainHelper.h"
+#include "screener.h"
+#include "portfolioManager.h"
 
 static DailyData* lastAnalyzedData = NULL;
 static int lastDataCount = 0;
 static char lastSymbol[16] = {0};
 
-void pressEnterToContinue() {
-    printf("\n계속하려면 Enter 키를 누르세요...");
-    while(getchar() != '\n');
-    getchar();
-}
-
-void printMainMenu() {
+void printMainMenu(const Portfolio* portfolio) {
     system("clear");
     printf("=========================================\n");
-    printf("=   C언어 주식 분석 및 백테스팅 플랫폼   =\n");
-    printf("=========================================\n");
-    if (lastDataCount > 0) {
-        printf("  [현재 분석된 종목: %s]\n", lastSymbol);
-    }
-    printf("\n");
-    printf("  1. 종목 분석하기\n");
-    printf("  2. 종목 검색하기\n");
-    printf("  3. 종목 목록 보기\n");
-    if (lastDataCount > 0) {
-        printf("  4. 마지막 분석 차트 보기\n");
-    }
-    printf("  0. 프로그램 종료\n");
-    printf("\n");
+    printf("=   C언어 주식 포트폴리오 & 분석 플랫폼  =\n");
+    printf("=========================================\n\n");
+
+    printf("  [실전 모의 투자]\n");
+    printf("  1. 내 포트폴리오 보기/관리 (실시간)\n\n");
+    
+    printf("  [연습 과거 시뮬레이션]\n");
+    printf("  2. 트레이딩 시뮬레이션 시작하기\n\n");
+    
+    printf("  [분석 도구]\n");
+    printf("  3. 추천 종목 자동 분석 (스크리너)\n");
+    printf("  4. 단일 종목 수동 분석 (백테스팅)\n");
+    printf("  5. 종목 검색하기 / 6. 종목 목록 보기\n\n");
+    
+    printf("  0. 저장하고 종료\n");
     printf("=========================================\n");
     printf("선택: ");
 }
 
-void viewStockList() {
-    displayStockList();
-    pressEnterToContinue();
-}
-
-void analyzeStock() {
-    const char* apiKey = "YOUR_API_KEY";
+void analyzeStock(const char* apiKey) {
     char currentSymbol[16];
 
     system("clear");
-    printf("## 새로운 종목 분석 ##\n");
-    printf("분석할 미국 주식 종목 코드를 입력하세요 (예: IBM, AAPL): ");
+    printf("## 단일 종목 수동 분석 ##\n");
+    printf("분석할 주식 종목 코드를 입력하세요 (예: IBM, AAPL): ");
     scanf("%s", currentSymbol);
-
+    while(getchar() != '\n');
 
     if (lastAnalyzedData != NULL) {
         freeData(lastAnalyzedData);
@@ -65,71 +56,84 @@ void analyzeStock() {
     if (fetchAndSaveData(currentSymbol, apiKey) == 0) {
         char filePath[256];
         snprintf(filePath, sizeof(filePath), "data/%s_daily.csv", currentSymbol);
-
         int dataCount = loadCsvFile(filePath, &lastAnalyzedData);
 
         if (dataCount > 0) {
             lastDataCount = dataCount;
             strcpy(lastSymbol, currentSymbol);
-
             calculateSma(lastAnalyzedData, lastDataCount, 5);
             calculateSma(lastAnalyzedData, lastDataCount, 20);
-            runBacktest(lastAnalyzedData, lastDataCount);
-
+            SimulationState finalState = runBacktest(lastAnalyzedData, lastDataCount);
+            printDetailedReport(finalState, lastAnalyzedData, lastDataCount);
         }
     }
     pressEnterToContinue();
 }
 
+void searchStock(const char* apiKey) {
+    char keyword[50];
+    system("clear");
+    printf("## 종목 검색 ##\n");
+    printf("검색할 키워드를 입력하세요 (예: apple, microsoft): ");
+    scanf("%s", keyword);
+    while(getchar() != '\n');
+    searchSymbols(keyword, apiKey);
+    pressEnterToContinue();
+}
+
+void viewStockList() {
+    displayStockList();
+    pressEnterToContinue();
+}
+
 void viewChart() {
     if (lastAnalyzedData == NULL) {
-        printf("먼저 종목 분석을 실행해주세요.\n");
+        printf("먼저 '4. 단일 종목 수동 분석'을 실행해주세요.\n");
     } else {
         plotChart(lastAnalyzedData, lastDataCount);
     }
     pressEnterToContinue();
 }
 
-void searchStock() {
-    char keyword[50];
-    const char* apiKey = "YOUR_API_KEY";
-
-    system("clear");
-    printf("## 종목 검색 ##\n");
-    printf("검색할 키워드를 입력하세요 (예: apple, microsoft): ");
-    scanf("%s", keyword);
-
-    searchSymbols(keyword, apiKey);
-    pressEnterToContinue();
-}
-
 int main() {
-    int choice = -1;
+    Portfolio portfolio;
+    loadPortfolio(&portfolio);
+    
+    const char* apiKey = "W46WANT3781FTIOS";
 
+    int choice = -1;
     while (1) {
-        printMainMenu();
+        printMainMenu(&portfolio);
         scanf("%d", &choice);
+        while(getchar() != '\n');
 
         switch (choice) {
             case 1:
-                analyzeStock();
+                managePortfolio(&portfolio, apiKey);
                 break;
             case 2:
-                searchStock();
-                break;
-            case 3:
-                viewStockList();
-                break;
-            case 4:
                 if (lastDataCount > 0) {
-                    viewChart();
+                    startVirtualTrading(lastAnalyzedData, lastDataCount, &portfolio);
                 } else {
-                    printf("잘못된 선택입니다. 다시 입력해주세요.\n");
+                    printf("먼저 '4. 단일 종목 수동 분석'을 실행하여 시뮬레이션할 데이터를 로드해주세요.\n");
                     pressEnterToContinue();
                 }
                 break;
+            case 3:
+                runScreener();
+                break;
+            case 4:
+                analyzeStock(apiKey);
+                break;
+            case 5:
+                searchStock(apiKey);
+                break;
+            case 6:
+                viewStockList();
+                break;
             case 0:
                 printf("프로그램을 종료합니다.\n");
+                savePortfolio(&portfolio);
                 if (lastAnalyzedData != NULL) {
                     freeData(lastAnalyzedData);
                 }
@@ -140,6 +144,5 @@ int main() {
                 break;
         }
     }
-
     return 0;
 }

@@ -6,7 +6,6 @@
 //     char name[128];
 // } SearchResult;
 
-// 키워드로 심볼을 검색하고 결과를 출력하는 함수
 int searchSymbols(const char* keywords, const char* apiKey);
 
 #endif

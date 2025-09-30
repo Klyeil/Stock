@@ -2,12 +2,65 @@
 #include <math.h>
 #include "backTester.h"
 
-void runBacktest(DailyData* dataArray, int dataCount) {
-    if (dataCount < 21) {
-        printf("백테스트를 실행하기에 데이터가 부족합니다.\n");
-        return;
+
+void printDetailedReport(SimulationState simState, DailyData* dataArray, int dataCount) {
+    double finalPrice = dataArray[0].close;
+    double finalEquity = simState.cash + (simState.shares * finalPrice);
+    double totalReturn = ((finalEquity - simState.initialCash) / simState.initialCash) * 100;
+    double winRate = simState.totalTrades > 0 ? ((double)simState.winningTrades / simState.totalTrades) * 100 : 0.0;
+    double profitFactor = simState.grossLoss != 0 ? fabs(simState.grossProfit / simState.grossLoss) : 0.0;
+
+    printf("\n--- 백테스트 종료: 최종 리포트 (상세 해설) ---\n\n");
+    
+    printf("[분석 요약]\n");
+    printf("분석 기간(%s ~ %s) 동안,\n", dataArray[dataCount - 1].timestamp, dataArray[0].timestamp);
+    printf("초기 자본 $%.2f은(는) 최종 자산 $%.2f(으)로 마감되었습니다.\n\n", simState.initialCash, finalEquity);
+
+    printf("[성과 지표 해설]\n");
+    printf("1. 총 수익률: %.2f%%\n", totalReturn);
+    printf("   => 초기 자본 대비 자산이 얼마나 늘었는지 보여줍니다.\n");
+    if (totalReturn > 0) {
+        printf("   => 해석: 플러스(+) 수익을 기록했습니다. \n\n");
+    } else {
+        printf("   => 해석: 마이너스(-) 손실을 기록했습니다. \n\n");
     }
 
+    printf("2. 총 거래 횟수: %d회\n", simState.totalTrades);
+    printf("   => '매수 후 매도'가 완료된 거래의 총 횟수입니다.\n\n");
+
+    printf("3. 승률: %.2f%%\n", winRate);
+    printf("   => 전체 거래 중 이익을 본 거래의 비율입니다.\n");
+    if (simState.totalTrades > 0) {
+        if (winRate > 50.0) {
+            printf("   => 해석: 이긴 거래가 진 거래보다 많았습니다.\n\n");
+        } else if (winRate == 50.0) {
+            printf("   => 해석: 이긴 거래와 진 거래의 횟수가 같습니다.\n\n");
+        } else {
+            printf("   => 해석: 진 거래가 이긴 거래보다 많았습니다.\n\n");
+        }
+    }
+
+    printf("4. 수익비 (Profit Factor): %.2f\n", profitFactor);
+    printf("   => 총 수익을 총 손실로 나눈 값으로, 전략의 수익성을 판단합니다.\n");
+    if (simState.grossLoss == 0 && simState.grossProfit > 0) {
+        printf("   => 해석: 손실을 본 거래가 한 번도 없었습니다. (이상적인 결과)\n\n");
+    } else if (profitFactor > 1.0) {
+        printf("   => 해석: 총 수익이 총 손실보다 %.2f배 많았습니다. (수익성 있는 전략)\n\n", profitFactor);
+    } else {
+        printf("   => 해석: 총 손실이 총 수익보다 많거나 같았습니다. (개선이 필요한 전략)\n\n");
+    }
+
+    if (simState.shares > 0) {
+        double currentPositionValue = simState.shares * finalPrice;
+        double unrealizedProfit = currentPositionValue - simState.totalCost;
+        printf("[현재 보유 포지션 (미실현 손익)]\n");
+        printf("보유 주식: %d 주, 현재 평가액: $%.2f, 미실현 손익: $%.2f\n",
+               simState.shares, currentPositionValue, unrealizedProfit);
+    }
+     printf("--------------------------------------------------\n");
+}
+
+SimulationState runBacktest(DailyData* dataArray, int dataCount) {
     SimulationState simState;
     simState.initialCash = 10000.0;
     simState.cash = simState.initialCash;
@@ -18,9 +71,6 @@ void runBacktest(DailyData* dataArray, int dataCount) {
     simState.winningTrades = 0;
     simState.grossProfit = 0.0;
     simState.grossLoss = 0.0;
-
-    printf("\n--- 백테스트 실행 ---\n");
-    printf("초기 자본금: $%.2f\n", simState.initialCash);
 
     for (int i = dataCount - 2; i >= 0; i--) {
         double prevSma5 = dataArray[i + 1].sma5;
@@ -35,7 +85,6 @@ void runBacktest(DailyData* dataArray, int dataCount) {
                 simState.shares = sharesToBuy;
                 simState.cash -= sharesToBuy * currentPrice;
                 simState.totalCost = sharesToBuy * currentPrice;
-                printf("[%s] 매수: %d 주 @ $%.2f\n", dataArray[i].timestamp, sharesToBuy, currentPrice);
             }
         }
         else if (prevSma5 > prevSma20 && currentSma5 < currentSma20 && simState.shares > 0) {
@@ -43,7 +92,6 @@ void runBacktest(DailyData* dataArray, int dataCount) {
             double profit = saleValue - simState.totalCost;
             
             simState.cash += saleValue;
-            printf("[%s] 매도: %d 주 @ $%.2f | 손익: $%.2f\n", dataArray[i].timestamp, simState.shares, currentPrice, profit);
             simState.shares = 0;
 
             simState.totalTrades++;
@@ -55,34 +103,5 @@ void runBacktest(DailyData* dataArray, int dataCount) {
             }
         }
     }
-
-    // --- 최종 리포트 계산 및 출력 (수정된 로직) ---
-    double finalPrice = dataArray[0].close;
-    double finalEquity = simState.cash + (simState.shares * finalPrice); // 최종 자산 = 현금 + 보유주식 평가액
-    double totalReturn = ((finalEquity - simState.initialCash) / simState.initialCash) * 100;
-    double winRate = simState.totalTrades > 0 ? ((double)simState.winningTrades / simState.totalTrades) * 100 : 0.0;
-    double profitFactor = simState.grossLoss != 0 ? fabs(simState.grossProfit / simState.grossLoss) : 0.0;
-
-    printf("\n--- 백테스트 종료: 최종 리포트 ---\n\n");
-    printf("분석 기간: \t\t%s ~ %s\n", dataArray[dataCount - 1].timestamp, dataArray[0].timestamp);
-    printf("--------------------------------------------\n");
-    printf("초기 자산: \t\t$%.2f\n", simState.initialCash);
-    printf("최종 자산: \t\t$%.2f\n", finalEquity);
-    printf("총 수익률: \t\t%.2f%%\n", totalReturn);
-    
-    printf("\n--- 거래 통계 (확정 손익 기준) ---\n");
-    printf("총 거래 횟수: \t\t%d회\n", simState.totalTrades);
-    printf("승률: \t\t\t%.2f%%\n", winRate);
-    printf("수익비 (Profit Factor): \t%.2f\n", profitFactor);
-    
-    // --- 보유 중인 포지션에 대한 정보 추가 ---
-    if (simState.shares > 0) {
-        double currentPositionValue = simState.shares * finalPrice;
-        double unrealizedProfit = currentPositionValue - simState.totalCost;
-        printf("\n--- 현재 보유 포지션 (미실현 손익) ---\n");
-        printf("보유 주식: \t\t%d 주\n", simState.shares);
-        printf("현재 평가액: \t\t$%.2f\n", currentPositionValue);
-        printf("미실현 손익: \t\t$%.2f\n", unrealizedProfit);
-    }
-    printf("--------------------------------------------\n");
+    return simState;
 }

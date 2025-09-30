@@ -3,7 +3,7 @@
 #include <string.h>
 #include "dataProcessor.h"
 
-// csv 파일 로드 함수
+
 int loadCsvFile(const char* filePath, DailyData** dataArray) {
     FILE *fp = fopen(filePath, "r");
     if (!fp) {
@@ -49,7 +49,6 @@ void freeData(DailyData* dataArray) {
 }
 
 
-// 단순 이동 평균 계산 함수
 void calculateSma(DailyData* dataArray, int dataCount, int period) {
     if (dataCount < period) {
         return;
