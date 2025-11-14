@@ -4,8 +4,9 @@
 #include <curl/curl.h>
 #include <jansson.h>
 #include "apiHandler.h"
+#include <sys/stat.h>
+#include <time.h>
 
-// 공용 콜백 함수
 size_t writeCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realSize = size * nmemb;
     MemoryStruct *mem = (MemoryStruct *)userp;
@@ -24,11 +25,28 @@ size_t writeCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     return realSize;
 }
 
-// 과거 데이터 가져오는 함수
 int fetchAndSaveData(const char* symbol, const char* apiKey) {
+    char filePath[256];
+    snprintf(filePath, sizeof(filePath), "data/%s_daily.csv", symbol);
+
+    time_t now = time(NULL);
+    struct stat fileStat;
+    const double cacheDuration = 12 * 3600;
+
+    if (stat(filePath, &fileStat) == 0) {
+        double secondsSinceUpdate = difftime(now, fileStat.st_mtime);
+        
+        if (secondsSinceUpdate < cacheDuration) {
+            printf("'%s'은(는) 12시간 이내에 업데이트되었습니다. (캐시 사용)\n", symbol);
+            return 0;
+        }
+    }
+
+    printf("'%s'의 최신 데이터를 API에서 가져옵니다...\n", symbol);
+
     CURL *curlHandle;
     CURLcode res;
-    int returnCode = 0;
+    int returnCode = -1;
     
     MemoryStruct chunk;
     chunk.memory = malloc(1);
@@ -47,7 +65,6 @@ int fetchAndSaveData(const char* symbol, const char* apiKey) {
         curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeCallback);
         curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, (void *)&chunk);
 
-        printf("데이터 가져오는 중: %s\n", apiUrl);
         res = curl_easy_perform(curlHandle);
 
         if (res != CURLE_OK) {
@@ -59,13 +76,12 @@ int fetchAndSaveData(const char* symbol, const char* apiKey) {
                  returnCode = -1;
             } else {
                 printf("\n총 %zu 바이트 데이터 수신 완료.\n", chunk.size);
-                char filePath[256];
-                snprintf(filePath, sizeof(filePath), "data/%s_daily.csv", symbol);
                 FILE *outputFile = fopen(filePath, "wb");
                 if (outputFile) {
                     fwrite(chunk.memory, 1, chunk.size, outputFile);
                     fclose(outputFile);
                     printf("데이터를 %s 파일에 성공적으로 저장했습니다.\n", filePath);
+                    returnCode = 1;
                 } else {
                     returnCode = -1;
                 }
@@ -82,7 +98,6 @@ int fetchAndSaveData(const char* symbol, const char* apiKey) {
     curl_global_cleanup();
     return returnCode;
 }
-
 
 double fetchCurrentPrice(const char* symbol, const char* apiKey) {
     CURL *curlHandle;

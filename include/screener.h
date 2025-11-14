@@ -1,6 +1,6 @@
 #ifndef SCREENER_H
 #define SCREENER_H
 
-void runScreener();
+void runScreener(const char* apiKey);
 
 #endif

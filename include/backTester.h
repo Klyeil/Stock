@@ -3,7 +3,6 @@
 
 #include "dataProcessor.h"
 
-
 typedef struct SimulationState {
     double initialCash;
     double cash;
@@ -16,8 +15,8 @@ typedef struct SimulationState {
     double grossLoss;
 } SimulationState;
 
-
 SimulationState runBacktest(DailyData* dataArray, int dataCount);
-void printDetailedReport(SimulationState simState, DailyData* dataArray, int dataCount);
+
+void printDetailedReport(SimulationState simState, DailyData* dataArray, int dataCount, int shortPeriod, int longPeriod);
 
 #endif

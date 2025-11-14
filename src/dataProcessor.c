@@ -3,11 +3,10 @@
 #include <string.h>
 #include "dataProcessor.h"
 
-
 int loadCsvFile(const char* filePath, DailyData** dataArray) {
     FILE *fp = fopen(filePath, "r");
     if (!fp) {
-        fprintf(stderr, "Error: %s 파일을 열 수 없습니다.\n", filePath);
+        fprintf(stderr, "에러: %s 파일을 열 수 없습니다.\n", filePath);
         return -1;
     }
 
@@ -20,12 +19,15 @@ int loadCsvFile(const char* filePath, DailyData** dataArray) {
     while (fgets(line, 1024, fp)) {
         DailyData* temp = realloc(*dataArray, (dataCount + 1) * sizeof(DailyData));
         if (temp == NULL) {
-            fprintf(stderr, "Error: 메모리 재할당에 실패했습니다.\n");
+            fprintf(stderr, "에러: 메모리 재할당에 실패했습니다.\n");
             free(*dataArray);
             fclose(fp);
             return -1;
         }
         *dataArray = temp;
+        
+        (*dataArray)[dataCount].smaShort = 0.0;
+        (*dataArray)[dataCount].smaLong = 0.0;
 
         double open, high, low;
         sscanf(line, "%10[^,],%lf,%lf,%lf,%lf,%lld",
@@ -42,14 +44,7 @@ int loadCsvFile(const char* filePath, DailyData** dataArray) {
     return dataCount;
 }
 
-
-
-void freeData(DailyData* dataArray) {
-    free(dataArray);
-}
-
-
-void calculateSma(DailyData* dataArray, int dataCount, int period) {
+void calculateSma(DailyData* dataArray, int dataCount, int period, int isShortTerm) {
     if (dataCount < period) {
         return;
     }
@@ -59,11 +54,15 @@ void calculateSma(DailyData* dataArray, int dataCount, int period) {
             sum += dataArray[i + j].close;
         }
         double sma = sum / period;
-
-        if (period == 5) {
-            dataArray[i].sma5 = sma;
-        } else if (period == 20) {
-            dataArray[i].sma20 = sma;
+        
+        if (isShortTerm) {
+            dataArray[i].smaShort = sma;
+        } else {
+            dataArray[i].smaLong = sma;
         }
     }
+}
+
+void freeData(DailyData* dataArray) {
+    free(dataArray);
 }

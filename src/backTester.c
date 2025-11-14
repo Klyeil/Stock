@@ -2,8 +2,7 @@
 #include <math.h>
 #include "backTester.h"
 
-
-void printDetailedReport(SimulationState simState, DailyData* dataArray, int dataCount) {
+void printDetailedReport(SimulationState simState, DailyData* dataArray, int dataCount, int shortPeriod, int longPeriod) {
     double finalPrice = dataArray[0].close;
     double finalEquity = simState.cash + (simState.shares * finalPrice);
     double totalReturn = ((finalEquity - simState.initialCash) / simState.initialCash) * 100;
@@ -14,6 +13,7 @@ void printDetailedReport(SimulationState simState, DailyData* dataArray, int dat
     
     printf("[분석 요약]\n");
     printf("분석 기간(%s ~ %s) 동안,\n", dataArray[dataCount - 1].timestamp, dataArray[0].timestamp);
+    printf("분석 전략: \t\t%d일(단기) / %d일(장기) 이동평균 교차\n", shortPeriod, longPeriod);
     printf("초기 자본 $%.2f은(는) 최종 자산 $%.2f(으)로 마감되었습니다.\n\n", simState.initialCash, finalEquity);
 
     printf("[성과 지표 해설]\n");
@@ -60,6 +60,7 @@ void printDetailedReport(SimulationState simState, DailyData* dataArray, int dat
      printf("--------------------------------------------------\n");
 }
 
+
 SimulationState runBacktest(DailyData* dataArray, int dataCount) {
     SimulationState simState;
     simState.initialCash = 10000.0;
@@ -73,13 +74,18 @@ SimulationState runBacktest(DailyData* dataArray, int dataCount) {
     simState.grossLoss = 0.0;
 
     for (int i = dataCount - 2; i >= 0; i--) {
-        double prevSma5 = dataArray[i + 1].sma5;
-        double prevSma20 = dataArray[i + 1].sma20;
-        double currentSma5 = dataArray[i].sma5;
-        double currentSma20 = dataArray[i].sma20;
+        double prevSmaShort = dataArray[i + 1].smaShort;
+        double prevSmaLong = dataArray[i + 1].smaLong;
+        double currentSmaShort = dataArray[i].smaShort;
+        double currentSmaLong = dataArray[i].smaLong;
         double currentPrice = dataArray[i].close;
+        
 
-        if (prevSma5 < prevSma20 && currentSma5 > currentSma20 && simState.shares == 0) {
+        if (prevSmaShort == 0.0 || prevSmaLong == 0.0 || currentSmaShort == 0.0 || currentSmaLong == 0.0) {
+            continue;
+        }
+
+        if (prevSmaShort < prevSmaLong && currentSmaShort > currentSmaLong && simState.shares == 0) {
             int sharesToBuy = simState.cash / currentPrice;
             if (sharesToBuy > 0) {
                 simState.shares = sharesToBuy;
@@ -87,7 +93,7 @@ SimulationState runBacktest(DailyData* dataArray, int dataCount) {
                 simState.totalCost = sharesToBuy * currentPrice;
             }
         }
-        else if (prevSma5 > prevSma20 && currentSma5 < currentSma20 && simState.shares > 0) {
+        else if (prevSmaShort > prevSmaLong && currentSmaShort < currentSmaLong && simState.shares > 0) {
             double saleValue = simState.shares * currentPrice;
             double profit = saleValue - simState.totalCost;
             

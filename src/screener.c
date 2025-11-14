@@ -8,11 +8,11 @@
 #include "backTester.h"
 #include "mainHelper.h"
 
-// 각 종목의 분석 결과를 저장할 구조체
 typedef struct ScreenerResult {
     char symbol[16];
     double totalReturn;
 } ScreenerResult;
+
 
 int compareResults(const void* a, const void* b) {
     ScreenerResult* resultA = (ScreenerResult*)a;
@@ -22,8 +22,7 @@ int compareResults(const void* a, const void* b) {
     return 0;
 }
 
-void runScreener() {
-    const char* apiKey = "W46WANT3781FTIOS";
+void runScreener(const char* apiKey) {
     FILE *fp = fopen("data/screenerList.csv", "r");
     if (!fp) {
         fprintf(stderr, "에러: screenerList.csv 파일을 찾을 수 없습니다.\n");
@@ -33,11 +32,14 @@ void runScreener() {
 
     system("clear");
     printf("--- 자동 종목 스크리닝을 시작합니다 ---\n");
-    printf("API 제한으로 각 종목 분석 후 15초씩 대기합니다...\n\n");
+    printf("API 호출 시 15초씩 대기합니다...\n\n");
 
     ScreenerResult results[100];
     int resultCount = 0;
     char line[256];
+    
+    const int shortPeriod = 5;
+    const int longPeriod = 20;
 
     while (fgets(line, sizeof(line), fp)) {
         line[strcspn(line, "\n")] = 0;
@@ -48,7 +50,9 @@ void runScreener() {
         
         printf("분석 중 (%d)... %s (%s)\n", resultCount + 1, name, symbol);
 
-        if (fetchAndSaveData(symbol, apiKey) == 0) {
+        int fetchResult = fetchAndSaveData(symbol, apiKey);
+
+        if (fetchResult >= 0) {
             char filePath[256];
             snprintf(filePath, sizeof(filePath), "data/%s_daily.csv", symbol);
 
@@ -56,8 +60,8 @@ void runScreener() {
             int dataCount = loadCsvFile(filePath, &stockData);
 
             if (dataCount > 0) {
-                calculateSma(stockData, dataCount, 5);
-                calculateSma(stockData, dataCount, 20);
+                calculateSma(stockData, dataCount, shortPeriod, 1);
+                calculateSma(stockData, dataCount, longPeriod, 0);
                 
                 SimulationState finalState = runBacktest(stockData, dataCount);
                 double finalEquity = finalState.cash + (finalState.shares * stockData[0].close);
@@ -70,18 +74,21 @@ void runScreener() {
                 freeData(stockData);
             }
         }
-        printf("15초 대기...\n\n");
-        sleep(15);
+        
+        if (fetchResult == 1) {
+            printf("15초 대기...\n\n");
+            sleep(15);
+        } else {
+            printf("\n");
+        }
     }
     fclose(fp);
 
-
     qsort(results, resultCount, sizeof(ScreenerResult), compareResults);
-
 
     system("clear");
     printf("--- 자동 분석 결과 TOP 10 ---\n\n");
-    printf("기준 전략: 5일/20일 이동평균선 교차\n");
+    printf("기준 전략: %d일/%d일 이동평균선 교차\n", shortPeriod, longPeriod);
     printf("----------------------------------\n");
     printf(" 순위 | 종목코드   | 과거 수익률\n");
     printf("----------------------------------\n");

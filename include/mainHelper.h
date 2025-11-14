@@ -3,4 +3,8 @@
 
 void pressEnterToContinue();
 
+int getIntegerInput();
+
+void getStringInput(char* buffer, int size);
+
 #endif
