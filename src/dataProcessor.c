@@ -12,31 +12,49 @@ int loadCsvFile(const char* filePath, DailyData** dataArray) {
 
     char line[1024];
     int dataCount = 0;
-    *dataArray = NULL;
+
+    if (fgets(line, 1024, fp) == NULL) {
+        fclose(fp);
+        return 0; 
+    }
+
+    while (fgets(line, 1024, fp)) {
+        dataCount++;
+    }
+
+    if (dataCount == 0) {
+        fclose(fp);
+        return 0; 
+    }
+
+    *dataArray = malloc(dataCount * sizeof(DailyData));
+    if (*dataArray == NULL) {
+        fprintf(stderr, "에러: 메모리 할당에 실패했습니다.\n");
+        fclose(fp);
+        return -1;
+    }
+
+    rewind(fp);
 
     fgets(line, 1024, fp);
 
+    int currentIndex = 0;
     while (fgets(line, 1024, fp)) {
-        DailyData* temp = realloc(*dataArray, (dataCount + 1) * sizeof(DailyData));
-        if (temp == NULL) {
-            fprintf(stderr, "에러: 메모리 재할당에 실패했습니다.\n");
-            free(*dataArray);
-            fclose(fp);
-            return -1;
+        if (currentIndex >= dataCount) {
+            break; 
         }
-        *dataArray = temp;
         
-        (*dataArray)[dataCount].smaShort = 0.0;
-        (*dataArray)[dataCount].smaLong = 0.0;
+        (*dataArray)[currentIndex].smaShort = 0.0;
+        (*dataArray)[currentIndex].smaLong = 0.0;
 
         double open, high, low;
         sscanf(line, "%10[^,],%lf,%lf,%lf,%lf,%lld",
-               (*dataArray)[dataCount].timestamp,
+               (*dataArray)[currentIndex].timestamp,
                &open, &high, &low,
-               &(*dataArray)[dataCount].close,
-               &(*dataArray)[dataCount].volume);
+               &(*dataArray)[currentIndex].close,
+               &(*dataArray)[currentIndex].volume);
         
-        dataCount++;
+        currentIndex++;
     }
 
     fclose(fp);

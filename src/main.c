@@ -26,7 +26,7 @@ void printMainMenu(const Portfolio* portfolio) {
 
     system("clear");
     printf("=========================================\n");
-    printf("=   C언어 주식 포트폴리오 & 분석 플랫폼  =\n");
+    printf("=   C언어 주식 포트폴리오 & 분석 플랫폼 =\n");
     printf("=   (오늘 날짜: %s)   =\n", dateStr);
     printf("=========================================\n\n");
 
@@ -158,9 +158,25 @@ int main() {
                     pressEnterToContinue();
                 }
                 break;
-            case 3:
-                runScreener(apiKey);
+            case 3: {
+                int shortPeriod = 0, longPeriod = 0;
+                system("clear");
+                printf("## 추천 종목 자동 분석 (스크리너) ##\n");
+
+                while (shortPeriod <= 0) {
+                    printf("분석에 사용할 단기 이동평균 기간(일)을 입력하세요 (예: 5, 10): ");
+                    shortPeriod = getIntegerInput();
+                    if (shortPeriod <= 0) printf("기간은 0보다 커야 합니다.\n");
+                }
+                while (longPeriod <= shortPeriod) {
+                    printf("분석에 사용할 장기 이동평균 기간(일)을 입력하세요 (예: 20, 60): ");
+                    longPeriod = getIntegerInput();
+                    if (longPeriod <= shortPeriod) printf("장기 기간은 단기 기간(%d일)보다 길어야 합니다.\n", shortPeriod);
+                }
+                
+                runScreener(apiKey, shortPeriod, longPeriod);
                 break;
+            }
             case 4:
                 analyzeStock(apiKey);
                 break;
